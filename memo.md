@@ -103,3 +103,63 @@
 - Claude外のターミナルで `claude mcp add playwright npx @playwright/mcp@latest`を実行
   - 最初のplaywrightはサーバーの名前、それ以降はローカルでサーバーを起動することを示すコマンド
 - その後、claudeを起動
+
+## Hooks and SDK
+
+### Introducing Hooks
+
+#### Hooksとは
+
+- Claudeに何かを尋ねるとクエリはツール定義と共にClaudeモデルに送信される
+- Claudeはフォーマットされたレスポンスを提供することでツールの使用を決定する可能性があり、その後Claude Codeはそのツールを実行して結果を返す
+- Hooksはこのプロセスに挿入され、ツールの実行直前または直後にコードを実行できるようにする
+- Hooksには二種類あり、ツールが呼び出される前に実行される「PreToolUse hooks」とツール呼出し後に行われる「PostToolUse hooks」がある
+
+### Defining hooks・Implementing a hook
+
+#### `.env`ファイルの読み取りを防ぐ
+
+- ファイルを読み取る前に防ぎたいのでPreToolUse
+- ファイルの中身を読み取ることが出来るToolとして、「Read」と「Grep」がある
+- setting.jsonで設定する
+
+  ```json
+  "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "Read|Grep",
+          "hooks": [
+            {
+              "type": "command",
+              <!-- commandは具体的な実行コードの場所を入れる -->
+              "command": "node ~/.claude/hooks/read_hook.js"
+            }
+          ]
+        }
+      ]
+    }
+  ```
+
+- `read_hook.js`の中身
+
+```js
+async function main() {
+  const chunks = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(chunk);
+  }
+  const toolArgs = JSON.parse(Buffer.concat(chunks).toString());
+
+  // readPath is the path to the file that Claude is trying to read
+  const readPath =
+    toolArgs.tool_input?.file_path || toolArgs.tool_input?.path || "";
+
+  // TODO: ensure Claude isn't trying to read the .env file
+  if (readPath.includes(".env")) {
+    console.error(".env を読み込もうとしているため、拒否されました。");
+    process.exit(2);
+  }
+}
+
+main();
+```
