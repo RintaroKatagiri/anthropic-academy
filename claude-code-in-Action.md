@@ -1,4 +1,4 @@
-# Claude Codeメモ
+# Claude Code in Actionメモ
 
 ## Getting hands on
 
